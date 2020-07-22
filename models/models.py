@@ -3,6 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import torch.nn.init as init
+from train import params
+
+#TODO: figure out why input to classifiers is not shape of output of feature extractor
 
 class GradReverse(torch.autograd.Function):
     """
@@ -21,144 +24,114 @@ class GradReverse(torch.autograd.Function):
     def grad_reverse(x, constant):
         return GradReverse.apply(x, constant)
 
+
+
+#TODO: may have to zero pad if there are utterances shorter than the size of the kernel
+#TODO: convolution layers expect (batch_size, in_channels, height of input, width of input)
+#padding = int (same value used for height and weight) or tuple (first int is height and second is width)
 class Extractor(nn.Module):
-
-    def __init__(self):
+    """
+    CNN models adapted from @bentrevett pytorch-sentiment-analysis
+    """
+    def __init__(self, embedding_dim, num_layers): #embedding_dim will be params.mod_dim
         super(Extractor, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=5)
-        self.conv2 = nn.Conv2d(32, 48, kernel_size=5)
-        # self.conv1 = nn.Conv2d(3, 64, kernel_size= 5)
-        # self.bn1 = nn.BatchNorm2d(64)
-        # self.conv2 = nn.Conv2d(64, 50, kernel_size= 5)
-        # self.bn2 = nn.BatchNorm2d(50)
-        self.conv2_drop = nn.Dropout2d()
 
-    def forward(self, input):
-        input = input.expand(input.data.shape[0], 3, 28, 28)
-        # x = F.relu(F.max_pool2d(self.bn1(self.conv1(input)), 2))
-        # x = F.relu(F.max_pool2d(self.conv2_drop(self.bn2(self.conv2(x))), 2))
-        # x = x.view(-1, 50 * 4 * 4)
-        x = F.relu(F.max_pool2d(self.conv1(input), 2))
-        x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        x = x.view(-1, 48 * 4 * 4)
+        self.convs = nn.ModuleList([nn.Conv2d(in_channels=1, out_channels=100,
+                                              kernel_size=(4, embedding_dim)) for n in range(num_layers)])
+#TODO: figure out required output dims for FMT
+        self.fc = nn.Linear(num_layers*100, embedding_dim)
 
-        return x
+        self.dropout = nn.Dropout() #or nn.Dropout2d()
 
+        print(embedding_dim, num_layers)
+
+#TODO: try training with and without Linear layer
+    def forward(self, input, embedding_dim, num_layers):
+        #input = [batch_size, seq_length, embedding dim]
+        input = input.unsqueeze(1) #unsqueeze to add channel dimension
+        #TODO: check these squeezes
+        conved = [F.relu(conv(input)).squeeze(3) for conv in self.convs]
+        #x = [batch_size, n filters, seq length - filtersizes[n] +1]
+        pooled = [F.max_pool1d(conv, conv.shape[2]).squeeze(2) for conv in conved]
+        #input = input.expand(input.data.shape[0], 3, 28, 28)
+        #return = [batch_size, 100 * 2]
+        dropped = self.dropout(torch.cat(pooled, dim=1))
+        print(dropped.shape)
+        final = self.fc(dropped)
+        print(final.shape)
+        quit()
+        return final
+
+
+    # def __init__(self, embedding_dim):
+    #     super(Extractor, self).__init__()
+    #     self.conv1 = nn.Conv2d(in_channels=1, out_channels=100, kernel_size=(3, embedding_dim))
+    #     self.conv2 = nn.Conv2d(in_channels=1, out_channels=100, kernel_size=(4, embedding_dim))
+    #     self.conv3 = nn.Conv2d(in_channels=1, out_channels=100, kernel_size=(5, embedding_dim))
+    #     self.dropout = nn.Dropout()
+    #
+    # def forward(self, input):
+    #     input = input.unsqueeze(1)
+    #
+    #     conved1 = F.relu(self.conv1(input).squeeze(3))
+    #     conved2 = F.relu(self.conv2(input).squeeze(3))
+    #     conved3 = F.relu(self.conv3(input).squeeze(3))
+    #
+    #     pooled1 = F.max_pool1d(conved1, conved1.shape[2]).squeeze(2)
+    #     pooled2 = F.max_pool1d(conved2, conved2.shape[2]).squeeze(2)
+    #     pooled3 = F.max_pool1d(conved3, conved3.shape[2]).squeeze(2)
+    #
+    #     cat = torch.cat((pooled1, pooled2, pooled3), dim=1)
+    #
+    #     return self.dropout(cat)
+
+
+
+
+#from @ptrblck: https://discuss.pytorch.org/t/how-can-l-load-my-best-model-as-a-feature-extractor-evaluator/17254
+activation = {}
+def get_activation(name):
+    def hook(model, input, output):
+        activation[name] = output.detach()
+    return hook
+
+#TODO: could try classifier as DNN and CNN
 class Class_classifier(nn.Module):
 
-    def __init__(self):
+    def __init__(self, output_dim): #TODO: add output_dim in train
         super(Class_classifier, self).__init__()
-        # self.fc1 = nn.Linear(50 * 4 * 4, 100)
-        # self.bn1 = nn.BatchNorm1d(100)
-        # self.fc2 = nn.Linear(100, 100)
-        # self.bn2 = nn.BatchNorm1d(100)
-        # self.fc3 = nn.Linear(100, 10)
-        self.fc1 = nn.Linear(48 * 4 * 4, 100)
-        self.fc2 = nn.Linear(100, 100)
-        self.fc3 = nn.Linear(100, 10)
+        #two hidden layers
+        #TODO: fix hardcoded embed dim
+        self.in_layer = nn.Linear(74, 512)
+        self.hid_layer = nn.Linear(512, 256)
+        self.out_layer = nn.Linear(256, output_dim)
+        self.dropout = nn.Dropout()
 
-    def forward(self, input):
-        # logits = F.relu(self.bn1(self.fc1(input)))
-        # logits = self.fc2(F.dropout(logits))
-        # logits = F.relu(self.bn2(logits))
-        # logits = self.fc3(logits)
-        logits = F.relu(self.fc1(input))
-        logits = self.fc2(F.dropout(logits))
-        logits = F.relu(logits)
-        logits = self.fc3(logits)
+    def forward(self, input, output_dim):
+        input = F.relu(self.in_layer(input))
+        input = self.hid_layer(self.dropout(input))
+        input = F.relu(input)
+        input = self.out_layer(input)
+        print(input.shape)
+#TODO: check log softmax is right
+        return F.log_softmax(input, 1)
 
-        return F.log_softmax(logits, 1)
 
 class Domain_classifier(nn.Module):
 
     def __init__(self):
         super(Domain_classifier, self).__init__()
-        # self.fc1 = nn.Linear(50 * 4 * 4, 100)
-        # self.bn1 = nn.BatchNorm1d(100)
-        # self.fc2 = nn.Linear(100, 2)
-        self.fc1 = nn.Linear(48 * 4 * 4, 100)
-        self.fc2 = nn.Linear(100, 2)
+        #TODO: fix hardcoded embed dim
+        self.in_layer = nn.Linear(74, 512)
+        self.hid_layer = nn.Linear(512, 256)
+        self.out_layer = nn.Linear(256, 2)
+        self.dropout = nn.Dropout()
 
     def forward(self, input, constant):
         input = GradReverse.grad_reverse(input, constant)
-        # logits = F.relu(self.bn1(self.fc1(input)))
-        # logits = F.log_softmax(self.fc2(logits), 1)
-        logits = F.relu(self.fc1(input))
-        logits = F.log_softmax(self.fc2(logits), 1)
+        input = F.relu(self.in_layer(input))
+        input = F.relu(self.hid_layer(input))
+        input = F.log_softmax(self.out_layer(input), 1)
 
-        return logits
+        return input
 
-
-
-class SVHN_Extractor(nn.Module):
-
-    def __init__(self):
-        super(SVHN_Extractor, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size= 5)
-        self.bn1 = nn.BatchNorm2d(64)
-        self.conv2 = nn.Conv2d(64, 64, kernel_size= 5)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size= 5, padding= 2)
-        self.bn3 = nn.BatchNorm2d(128)
-        self.conv3_drop = nn.Dropout2d()
-        self.init_params()
-
-    def init_params(self):
-
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                init.kaiming_normal_(m.weight, mode= 'fan_out')
-                if m.bias is not None:
-                    init.constant_(m.bias, 0)
-            if isinstance(m, nn.BatchNorm2d):
-                init.constant_(m.weight, 1)
-                init.constant_(m.bias, 0)
-
-    def forward(self, input):
-        input = input.expand(input.data.shape[0], 3, 28, 28)
-        x = F.relu(self.bn1(self.conv1(input)))
-        x = F.max_pool2d(x, 3, 2)
-        x = F.relu(self.bn2(self.conv2(x)))
-        x = F.max_pool2d(x, 3, 2)
-        x = F.relu(self.bn3(self.conv3(x)))
-        x = self.conv3_drop(x)
-
-        return x.view(-1, 128 * 3 * 3)
-
-class SVHN_Class_classifier(nn.Module):
-
-    def __init__(self):
-        super(SVHN_Class_classifier, self).__init__()
-        self.fc1 = nn.Linear(128 * 3 * 3, 3072)
-        self.bn1 = nn.BatchNorm1d(3072)
-        self.fc2 = nn.Linear(3072, 2048)
-        self.bn2 = nn.BatchNorm1d(2048)
-        self.fc3 = nn.Linear(2048, 10)
-
-    def forward(self, input):
-        logits = F.relu(self.bn1(self.fc1(input)))
-        logits = F.dropout(logits)
-        logits = F.relu(self.bn2(self.fc2(logits)))
-        logits = self.fc3(logits)
-
-        return F.log_softmax(logits, 1)
-
-class SVHN_Domain_classifier(nn.Module):
-
-    def __init__(self):
-        super(SVHN_Domain_classifier, self).__init__()
-        self.fc1 = nn.Linear(128 * 3 * 3, 1024)
-        self.bn1 = nn.BatchNorm1d(1024)
-        self.fc2 = nn.Linear(1024, 1024)
-        self.bn2 = nn.BatchNorm1d(1024)
-        self.fc3 = nn.Linear(1024, 2)
-
-    def forward(self, input, constant):
-        input = GradReverse.grad_reverse(input, constant)
-        logits = F.relu(self.bn1(self.fc1(input)))
-        logits = F.dropout(logits)
-        logits = F.relu(self.bn2(self.fc2(logits)))
-        logits = F.dropout(logits)
-        logits = self.fc3(logits)
-
-        return F.log_softmax(logits, 1)

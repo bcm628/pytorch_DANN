@@ -23,8 +23,12 @@ def get_train_loader(dataset):
     if dataset == 'MNIST':
         transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(mean= params.dataset_mean, std= params.dataset_std)
+            transforms.Normalize((0.5,),(0.5,))
         ])
+        # transform = transforms.Compose([
+        #     transforms.ToTensor(),
+        #     transforms.Normalize(mean= params.dataset_mean, std= params.dataset_std)
+        # ])
 
         data = datasets.MNIST(root= params.mnist_path, train= True, transform= transform,
                               download= True)
@@ -36,8 +40,13 @@ def get_train_loader(dataset):
         transform = transforms.Compose([
             transforms.RandomCrop((28)),
             transforms.ToTensor(),
-            transforms.Normalize(mean= params.dataset_mean, std= params.dataset_std)
+            transforms.Normalize((0.5,),(0.5,))
         ])
+        # transform = transforms.Compose([
+        #     transforms.RandomCrop((28)),
+        #     transforms.ToTensor(),
+        #     transforms.Normalize(mean= params.dataset_mean, std= params.dataset_std)
+        # ])
 
         data = datasets.ImageFolder(root=params.mnistm_path + '/train', transform= transform)
 
@@ -83,8 +92,12 @@ def get_test_loader(dataset):
     if dataset == 'MNIST':
         transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(mean= params.dataset_mean, std= params.dataset_std)
+            transforms.Normalize((0.5,),(0.5,))
         ])
+        # transform = transforms.Compose([
+        #     transforms.ToTensor(),
+        #     transforms.Normalize(mean= params.dataset_mean, std= params.dataset_std)
+        # ])
 
         data = datasets.MNIST(root= params.mnist_path, train= False, transform= transform,
                               download= True)
@@ -92,11 +105,16 @@ def get_test_loader(dataset):
         dataloader = DataLoader(dataset= data, batch_size= 1, shuffle= False)
     elif dataset == 'MNIST_M':
         transform = transforms.Compose([
-            # transforms.RandomCrop((28)),
-            transforms.CenterCrop((28)),
+            transforms.RandomCrop((28)),
             transforms.ToTensor(),
-            transforms.Normalize(mean= params.dataset_mean, std= params.dataset_std)
+            transforms.Normalize((0.5,),(0.5,))
         ])
+        # transform = transforms.Compose([
+        #     # transforms.RandomCrop((28)),
+        #     transforms.CenterCrop((28)),
+        #     transforms.ToTensor(),
+        #     transforms.Normalize(mean= params.dataset_mean, std= params.dataset_std)
+        # ])
 
         data = datasets.ImageFolder(root=params.mnistm_path + '/test', transform= transform)
 

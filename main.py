@@ -1,6 +1,8 @@
 """
 Main script for models
 """
+#TODO: add pickling of output representations
+#TODO: zero-pad iemocap input
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
@@ -8,10 +10,13 @@ import torch.nn as nn
 import torch.optim as optim
 
 import numpy as np
+import pickle
 
 from models import models
 from train import test, train, params
 from util import utils
+from util import dataloaders
+
 from sklearn.manifold import TSNE
 
 import argparse, sys, os
@@ -22,7 +27,7 @@ from torch.autograd import Variable
 import time
 
 
-
+#TODO: check if this needs changing to work
 def visualizePerformance(feature_extractor, class_classifier, domain_classifier, src_test_dataloader,
                          tgt_test_dataloader, num_of_samples=None, imgName=None):
     """
@@ -116,11 +121,26 @@ def main(args):
     params.fig_mode = args.fig_mode
     params.epochs = args.max_epoch
     params.training_mode = args.training_mode
-    params.source_domain = args.source_domain
-    params.target_domain = args.target_domain
+    source_domain = args.source_domain
+    print("source domain is: ", source_domain)
+    target_domain = args.target_domain
+    print("target domain is: ", target_domain)
+
+    params.modality = args.modality
+    print("modality is :", params.modality)
+    params.extractor_layers = args.extractor_layers
+    print("number of layers in feature extractor: ", params.extractor_layers)
+    #params.class_layers = args.class_layers
+    #params.domain_layers  = args.domain_layers
     if params.embed_plot_epoch is None:
         params.embed_plot_epoch = args.embed_plot_epoch
-    params.lr = args.lr
+    lr = args.lr
+
+    #set output dims for classifier
+    if source_domain == 'iemocap':
+        params.output_dim = 4
+    elif source_domain == 'mosei':
+        params.output_dim = 6
 
 
     if args.save_dir is not None:
@@ -130,10 +150,10 @@ def main(args):
 
     # prepare the source data and target data
 
-    src_train_dataloader = utils.get_train_loader(params.source_domain)
-    src_test_dataloader = utils.get_test_loader(params.source_domain)
-    tgt_train_dataloader = utils.get_train_loader(params.target_domain)
-    tgt_test_dataloader = utils.get_test_loader(params.target_domain)
+    src_train_dataloader = dataloaders.get_train_loader(source_domain)
+    src_test_dataloader = dataloaders.get_test_loader(source_domain)
+    tgt_train_dataloader = dataloaders.get_train_loader(target_domain)
+    tgt_test_dataloader = dataloaders.get_test_loader(target_domain)
 
     if params.fig_mode is not None:
         print('Images from training on source domain:')
@@ -144,10 +164,14 @@ def main(args):
         utils.displayImages(tgt_test_dataloader, imgName='target')
 
     # init models
-    model_index = params.source_domain + '_' + params.target_domain
-    feature_extractor = params.extractor_dict[model_index]
-    class_classifier = params.class_dict[model_index]
-    domain_classifier = params.domain_dict[model_index]
+    model_index = source_domain + '_' + target_domain
+
+    feature_extractor = models.Extractor(embedding_dim=params.mod_dim, num_layers=params.extractor_layers)
+    class_classifier = models.Class_classifier(output_dim=params.output_dim)
+    domain_classifier = models.Domain_classifier()
+    # feature_extractor = params.extractor_dict[model_index]
+    # class_classifier = params.class_dict[model_index]
+    # domain_classifier = params.domain_dict[model_index]
 
     if params.use_gpu:
         feature_extractor.cuda()
@@ -155,19 +179,22 @@ def main(args):
         domain_classifier.cuda()
 
     # init criterions
-    class_criterion = nn.NLLLoss()
-    domain_criterion = nn.NLLLoss()
+    class_criterion = nn.CrossEntropyLoss() #negative log likelihood
+    domain_criterion = nn.CrossEntropyLoss()
 
     # init optimizer
     optimizer = optim.SGD([{'params': feature_extractor.parameters()},
                             {'params': class_classifier.parameters()},
-                            {'params': domain_classifier.parameters()}], lr= params.lr, momentum= 0.9)
+                            {'params': domain_classifier.parameters()}], lr=lr, momentum=0.9)
 
     for epoch in range(params.epochs):
         print('Epoch: {}'.format(epoch))
         train.train(args.training_mode, feature_extractor, class_classifier, domain_classifier, class_criterion, domain_criterion,
                     src_train_dataloader, tgt_train_dataloader, optimizer, epoch)
         test.test(feature_extractor, class_classifier, domain_classifier, src_test_dataloader, tgt_test_dataloader)
+        # if epoch == 100:
+        #     feature_extractor.fc.register_forward_hook(models.get_activation('fc'))
+        #     out = feature_extractor
 
 
         # Plot embeddings periodically.
@@ -177,13 +204,14 @@ def main(args):
 
 
 
+
 def parse_arguments(argv):
     """Command line parse."""
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--source_domain', type= str, default= 'MNIST', help= 'Choose source domain.')
+    parser.add_argument('--source_domain', type= str, default= 'mosei', help= 'Choose source domain.')
 
-    parser.add_argument('--target_domain', type= str, default= 'MNIST_M', help = 'Choose target domain.')
+    parser.add_argument('--target_domain', type= str, default= 'iemocap', help = 'Choose target domain.')
 
     parser.add_argument('--fig_mode', type=str, default=None, help='Plot experiment figures.')
 
@@ -196,6 +224,16 @@ def parse_arguments(argv):
     parser.add_argument('--embed_plot_epoch', type= int, default=100, help= 'Epoch number of plotting embeddings.')
 
     parser.add_argument('--lr', type= float, default= 0.01, help= 'Learning rate.')
+
+    parser.add_argument('--modality', type=str, default='acoustic', help='specify modality: acoustic or visual.')
+
+    parser.add_argument('--extractor_layers', type = int, default=2, help='number of layers in feature extractor CNN')
+
+    #parser.add_argument('--class_layers', type=int, default=2, help='number of layers in class classifier')
+
+    #parser.add_argument('--domain_layers', type=int, default=2, help='number of layers in domain classifier')
+
+    #parser.add_argument('--classifier_type', type=str, default='DNN', help='type of class classifier: "DNN" or "CNN"')
 
     return parser.parse_args()
 

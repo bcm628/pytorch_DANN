@@ -1,10 +1,10 @@
 import os, shutil
 
-data_dir = './data/MNIST_M'
-train_labels = './data/MNIST_M/mnist_m_train_labels.txt'
-test_labels = './data/MNIST_M/mnist_m_test_labels.txt'
-train_images = './data/MNIST_M/mnist_m_train'
-test_images = './data/MNIST_M/mnist_m_test'
+data_dir = 'C:/Users/bcmye/PycharmProjects/dissertation/pytorch_DANN/data/MNIST_M'
+train_labels = 'C:/Users/bcmye/PycharmProjects/dissertation/pytorch_DANN/data/MNIST_M/mnist_m_train_labels.txt'
+test_labels = 'C:/Users/bcmye/PycharmProjects/dissertation/pytorch_DANN/data/MNIST_M/mnist_m_test_labels.txt'
+train_images = 'C:/Users/bcmye/PycharmProjects/dissertation/pytorch_DANN/data/MNIST_M/mnist_m_train'
+test_images = 'C:/Users/bcmye/PycharmProjects/dissertation/pytorch_DANN/data/MNIST_M/mnist_m_test'
 
 def mkdirs(path):
     train_dir = path + '/' + 'train'

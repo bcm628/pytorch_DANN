@@ -42,10 +42,14 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
 
             # prepare the data
             input1, label1 = sdata
+            print(input1.shape, label1.shape)
             input2, label2 = tdata
+            print(input2.shape, label2.shape)
             size = min((input1.shape[0], input2.shape[0]))
-            input1, label1 = input1[0:size, :, :, :], label1[0:size]
-            input2, label2 = input2[0:size, :, :, :], label2[0:size]
+            input1, label1 = input1[0:size, :, :], label1[0:size]
+            print(input1.shape, label1.shape)
+            input2, label2 = input2[0:size, :, :], label2[0:size]
+
             if params.use_gpu:
                 input1, label1 = Variable(input1.cuda()), Variable(label1.cuda())
                 input2, label2 = Variable(input2.cuda()), Variable(label2.cuda())
@@ -66,16 +70,17 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
                 target_labels = Variable(torch.ones((input2.size()[0])).type(torch.LongTensor))
 
             # compute the output of source domain and target domain
-            src_feature = feature_extractor(input1)
-            tgt_feature = feature_extractor(input2)
-
+            src_feature = feature_extractor(input1, embedding_dim=params.mod_dim, num_layers=params.extractor_layers)
+            print(src_feature.shape)
+            tgt_feature = feature_extractor(input2, embedding_dim=params.mod_dim, num_layers=params.extractor_layers)
+            print(tgt_feature.shape)
             # compute the class loss of src_feature
-            class_preds = class_classifier(src_feature)
+            class_preds = class_classifier(src_feature, output_dim=params.output_dim)
             class_loss = class_criterion(class_preds, label1)
 
             # compute the domain loss of src_feature and target_feature
-            tgt_preds = domain_classifier(tgt_feature, constant)
-            src_preds = domain_classifier(src_feature, constant)
+            tgt_preds = domain_classifier(tgt_feature, constant=constant)
+            src_preds = domain_classifier(src_feature, constant=constant)
             tgt_loss = domain_criterion(tgt_preds, target_labels)
             src_loss = domain_criterion(src_preds, source_labels)
             domain_loss = tgt_loss + src_loss
