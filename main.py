@@ -2,7 +2,7 @@
 Main script for models
 """
 #TODO: add pickling of output representations
-#TODO: zero-pad iemocap input
+#TODO: modify so class classifier only uses three dimensions
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
@@ -137,6 +137,7 @@ def main(args):
     lr = args.lr
 
     #set output dims for classifier
+    #TODO: change this to len of params dict?
     if source_domain == 'iemocap':
         params.output_dim = 4
     elif source_domain == 'mosei':
@@ -167,7 +168,7 @@ def main(args):
     model_index = source_domain + '_' + target_domain
 
     feature_extractor = models.Extractor(embedding_dim=params.mod_dim, num_layers=params.extractor_layers)
-    class_classifier = models.Class_classifier(output_dim=params.output_dim)
+    class_classifier = models.Class_classifier()
     domain_classifier = models.Domain_classifier()
     # feature_extractor = params.extractor_dict[model_index]
     # class_classifier = params.class_dict[model_index]
@@ -240,4 +241,7 @@ def parse_arguments(argv):
 
 
 if __name__ == '__main__':
+    start_time = time.time()
     main(parse_arguments(sys.argv[1:]))
+    time_passed = time.time() - start_time
+    print('Total time: ' + time.strftime("%H:%M:%S", time.gmtime(time_passed)))

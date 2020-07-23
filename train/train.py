@@ -5,6 +5,7 @@ import numpy as np
 from train import params
 from util import utils
 
+
 import torch.optim as optim
 
 
@@ -33,6 +34,10 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
     start_steps = epoch * len(source_dataloader)
     total_steps = params.epochs * len(source_dataloader)
 
+    output_all_mosei = []
+    label_all_mosei = []
+
+
     for batch_idx, (sdata, tdata) in enumerate(zip(source_dataloader, target_dataloader)):
 
         if training_mode == 'dann':
@@ -42,12 +47,14 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
 
             # prepare the data
             input1, label1 = sdata
-            print(input1.shape, label1.shape)
+            label1 = label1.long()
+            #print("input1:", input1.shape, "label1:", label1.shape)
             input2, label2 = tdata
-            print(input2.shape, label2.shape)
+            label2 = label2.long()
+            #print(input2.shape, label2.shape)
             size = min((input1.shape[0], input2.shape[0]))
             input1, label1 = input1[0:size, :, :], label1[0:size]
-            print(input1.shape, label1.shape)
+            #print(input1.shape, label1.shape)
             input2, label2 = input2[0:size, :, :], label2[0:size]
 
             if params.use_gpu:
@@ -71,12 +78,17 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
 
             # compute the output of source domain and target domain
             src_feature = feature_extractor(input1, embedding_dim=params.mod_dim, num_layers=params.extractor_layers)
-            print(src_feature.shape)
+            #print(src_feature.shape)
             tgt_feature = feature_extractor(input2, embedding_dim=params.mod_dim, num_layers=params.extractor_layers)
-            print(tgt_feature.shape)
+            #print(tgt_feature.shape)
+
             # compute the class loss of src_feature
-            class_preds = class_classifier(src_feature, output_dim=params.output_dim)
+            class_preds = class_classifier(src_feature)
+            #print("class preds:", class_preds.shape)
+            class_preds = class_preds.view(-1, 2)
+            label1 = label1.view(-1)
             class_loss = class_criterion(class_preds, label1)
+
 
             # compute the domain loss of src_feature and target_feature
             tgt_preds = domain_classifier(tgt_feature, constant=constant)

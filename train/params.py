@@ -27,6 +27,8 @@ class_layers = 1
 proj_dim_a = 40
 proj_dim_v = 80
 
+emo_labels = ['happy', 'sad', 'angry']
+
 # path params
 data_root = './data'
 

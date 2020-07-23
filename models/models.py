@@ -43,7 +43,7 @@ class Extractor(nn.Module):
 
         self.dropout = nn.Dropout() #or nn.Dropout2d()
 
-        print(embedding_dim, num_layers)
+        #print(embedding_dim, num_layers)
 
 #TODO: try training with and without Linear layer
     def forward(self, input, embedding_dim, num_layers):
@@ -56,10 +56,9 @@ class Extractor(nn.Module):
         #input = input.expand(input.data.shape[0], 3, 28, 28)
         #return = [batch_size, 100 * 2]
         dropped = self.dropout(torch.cat(pooled, dim=1))
-        print(dropped.shape)
+        #print(dropped.shape)
         final = self.fc(dropped)
-        print(final.shape)
-        quit()
+        #print(final.shape)
         return final
 
 
@@ -98,23 +97,23 @@ def get_activation(name):
 #TODO: could try classifier as DNN and CNN
 class Class_classifier(nn.Module):
 
-    def __init__(self, output_dim): #TODO: add output_dim in train
+    def __init__(self):
         super(Class_classifier, self).__init__()
         #two hidden layers
         #TODO: fix hardcoded embed dim
         self.in_layer = nn.Linear(74, 512)
         self.hid_layer = nn.Linear(512, 256)
-        self.out_layer = nn.Linear(256, output_dim)
+        self.out_layer = nn.Linear(256, 2 * 3)
         self.dropout = nn.Dropout()
 
-    def forward(self, input, output_dim):
+    def forward(self, input):
         input = F.relu(self.in_layer(input))
         input = self.hid_layer(self.dropout(input))
         input = F.relu(input)
         input = self.out_layer(input)
-        print(input.shape)
-#TODO: check log softmax is right
-        return F.log_softmax(input, 1)
+
+        return input
+
 
 
 class Domain_classifier(nn.Module):
@@ -131,7 +130,7 @@ class Domain_classifier(nn.Module):
         input = GradReverse.grad_reverse(input, constant)
         input = F.relu(self.in_layer(input))
         input = F.relu(self.hid_layer(input))
-        input = F.log_softmax(self.out_layer(input), 1)
-
+        #input = F.log_softmax(self.out_layer(input), 1)
+        input = self.out_layer(input)
         return input
 
