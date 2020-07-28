@@ -70,7 +70,7 @@ def main(args):
     #model_index = source_domain + '_' + target_domain
 
     feature_extractor = models.Extractor(embedding_dim=params.mod_dim)
-    class_classifier = models.Class_classifier()
+    class_classifier = models.Class_classifier_LSTM()
     domain_classifier = models.Domain_classifier()
     # feature_extractor = params.extractor_dict[model_index]
     # class_classifier = params.class_dict[model_index]

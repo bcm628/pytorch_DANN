@@ -50,6 +50,7 @@ class Extractor(nn.Module):
         pooled = [F.max_pool1d(conv, conv.shape[2]).squeeze(2) for conv in conved]
         dropped = self.dropout(torch.cat(pooled, dim=1))
         final = self.fc(dropped)
+        #print(final.shape)
         return final
 
 
@@ -60,7 +61,6 @@ def get_activation(name):
         activation[name] = output.detach()
     return hook
 
-#TODO: could try classifier as DNN and CNN
 class Class_classifier(nn.Module):
 
     def __init__(self):
@@ -92,13 +92,13 @@ class Class_classifier_LSTM(nn.Module):
 
     def init_hidden(self):
         #(num_layers, minibatch_size, hidden_dim)
-        return(torch.autograd.Variable(torch.zeros(1, 20, 256)),
-               torch.autograd.Variable(torch.zeros(1, 20, 256)))
+        return(torch.zeros(1, 20, 256).cuda().detach(),
+               torch.zeros(1, 20, 256).cuda().detach())
 
     def forward(self, input):
-        lstm_out, self.hidden = self.lstm(input.view(params.mod_dim, 1, -1),
+        lstm_out, self.hidden = self.lstm(input.view(1, 20, -1),
                                           self.hidden)
-        linear_out = self.fc(lstm_out.view(params.mod_dim, -1))
+        linear_out = self.fc(lstm_out[-1].view(20, -1))
 
         return F.log_softmax(linear_out)
 

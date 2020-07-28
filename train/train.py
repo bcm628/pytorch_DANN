@@ -78,9 +78,9 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
                 target_labels = Variable(torch.ones((input2.size()[0])).type(torch.LongTensor))
 
             # compute the output of source domain and target domain
-            src_feature = feature_extractor(input1, embedding_dim=params.mod_dim)
+            src_feature = feature_extractor(input1, embedding_dim=params.mod_dim, num_layers=params.extractor_layers)
             #print(src_feature.shape)
-            tgt_feature = feature_extractor(input2, embedding_dim=params.mod_dim)
+            tgt_feature = feature_extractor(input2, embedding_dim=params.mod_dim, num_layers=params.extractor_layers)
             #print(tgt_feature.shape)
 
             # compute the class loss of src_feature
@@ -97,6 +97,7 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
             tgt_loss = domain_criterion(tgt_preds, target_labels)
             src_loss = domain_criterion(src_preds, source_labels)
             domain_loss = tgt_loss + src_loss
+
 
             loss = class_loss + params.theta * domain_loss
             loss.backward()
