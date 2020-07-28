@@ -12,7 +12,7 @@ modality = None
 
 #TODO: change batch_size
 batch_size = 20
-epochs = 100
+epochs = 1000
 gamma = 10
 theta = 1
 

@@ -9,6 +9,7 @@ from util import utils
 import torch.optim as optim
 
 
+
 def train(training_mode, feature_extractor, class_classifier, domain_classifier, class_criterion, domain_criterion,
           source_dataloader, target_dataloader, optimizer, epoch):
     """
@@ -77,9 +78,9 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
                 target_labels = Variable(torch.ones((input2.size()[0])).type(torch.LongTensor))
 
             # compute the output of source domain and target domain
-            src_feature = feature_extractor(input1, embedding_dim=params.mod_dim, num_layers=params.extractor_layers)
+            src_feature = feature_extractor(input1, embedding_dim=params.mod_dim)
             #print(src_feature.shape)
-            tgt_feature = feature_extractor(input2, embedding_dim=params.mod_dim, num_layers=params.extractor_layers)
+            tgt_feature = feature_extractor(input2, embedding_dim=params.mod_dim)
             #print(tgt_feature.shape)
 
             # compute the class loss of src_feature
@@ -103,9 +104,9 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
 
             # print loss
             if (batch_idx + 1) % 10 == 0:
-                print('[{}/{} ({:.0f}%)]\tLoss: {:.6f}\tClass Loss: {:.6f}\tDomain Loss: {:.6f}'.format(
-                    batch_idx * len(input2), len(target_dataloader.dataset),
-                    100. * batch_idx / len(target_dataloader), loss.item(), class_loss.item(),
+                print('[{}/{} ({:.0f}%)]\tTrain Loss: {:.6f}\tClass Loss: {:.6f}\tDomain Loss: {:.6f}'.format(
+                    batch_idx * len(input2), len(source_dataloader.dataset),
+                    100. * batch_idx / len(source_dataloader), loss.item(), class_loss.item(),
                     domain_loss.item()
                 ))
 
@@ -113,8 +114,9 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
         elif training_mode == 'source':
             # prepare the data
             input1, label1 = sdata
-            size = input1.shape[0]
-            input1, label1 = input1[0:size, :, :, :], label1[0:size]
+            label1 = label1.long()
+            #size = input1.shape[0]
+            #input1, label1 = input1[0:size, :, :, :], label1[0:size]
 
             if params.use_gpu:
                 input1, label1 = Variable(input1.cuda()), Variable(label1.cuda())
@@ -126,10 +128,12 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
             optimizer.zero_grad()
 
             # compute the output of source domain and target domain
-            src_feature = feature_extractor(input1)
+            src_feature = feature_extractor(input1, embedding_dim=params.mod_dim)
 
             # compute the class loss of src_feature
             class_preds = class_classifier(src_feature)
+            class_preds = class_preds.view(-1, 2)
+            label1 = label1.view(-1)
             class_loss = class_criterion(class_preds, label1)
 
             class_loss.backward()

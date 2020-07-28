@@ -176,11 +176,11 @@ def displayImages(dataloader, length=8, imgName=None):
     images, labels = dataiter.next()
 
     # process images so they can be displayed.
-    images = images[:length]
-
-    images = torchvision.utils.make_grid(images).numpy()
-    images = images/2 + 0.5
-    images = np.transpose(images, (1, 2, 0))
+    # images = images[:length]
+    #
+    # images = torchvision.utils.make_grid(images).numpy()
+    # images = images/2 + 0.5
+    # images = np.transpose(images, (1, 2, 0))
 
 
     if params.fig_mode == 'display':
