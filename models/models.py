@@ -41,7 +41,6 @@ class Extractor(nn.Module):
         self.dropout = nn.Dropout() #or nn.Dropout2d()
 
 
-#TODO: try training with and without Linear layer
     def forward(self, input, embedding_dim, num_layers = [3,4,5]):
         #input = [batch_size, seq_length, embedding dim]
         input = input.unsqueeze(1) #unsqueeze to add channel dimension
