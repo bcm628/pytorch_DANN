@@ -27,10 +27,10 @@ class MultimodalDataset(Data.Dataset):
         self.root = root
         self.cls = cls
         self.mod = mod
-        # if len(MultimodalDataset.trainset.y) != 0 and cls != "train":
-        #     print("Data has been previously loaded, fetching from previous lists.")
-        # else:
-        self.load_data(mod)
+        if len(MultimodalDataset.trainset.y) != 0 and cls != "train":
+            print("Data has been previously loaded, fetching from previous lists.")
+        else:
+            self.load_data(mod)
 
         if self.cls == "train":
             self.dataset = MultimodalDataset.trainset
@@ -50,7 +50,8 @@ class MultimodalDataset(Data.Dataset):
         iemocap = pickle.load(open(dataset_path, 'rb'))
         #remove neutral labels since MOSEI does not have these
         for split in iemocap:
-            iemocap[split]['labels'] = np.expand_dims(iemocap[split]['labels'][:, 1:, 1], axis=2)
+            iemocap[split]['labels'] = iemocap[split]['labels'][:, 1:, 1]
+
 
         #set up a new data dictionary to remove samples with only neutral label
         dataset = {}

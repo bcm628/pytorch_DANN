@@ -42,19 +42,22 @@ def tsne_embeddings(src_embeddings, tgt_embeddings, epoch):
 
 
 def eval_data(label_all, output_all, set):
-    truths = np.array(label_all)
-    results = np.array(output_all) #different every time
-    test_preds = results.reshape((-1, 3, 2))
-    test_truth = truths.reshape((-1, 3))
+    truths = np.array(label_all) #540, 3
+    results = np.array(output_all)
+    print(results)#different every time
+    idx = np.argmax(results, axis=1)
+    results = np.zeros(results.shape)
+    results[np.arange(results.shape[0]), idx] = 1
+    print(results)
     f1_total = {}
     acc_total = {}
 
     for i, emo in enumerate(params.emo_labels):
-        test_preds_i = np.argmax(test_preds[:, i], axis=1) #all zeros
+        results_i = results[:, i] #all zeros
         #print(test_preds_i) #always prints array of zeros
-        test_truth_i = test_truth[:, i]
-        f1 = f1_score(test_truth_i, test_preds_i, average='weighted')
-        acc = accuracy_score(test_truth_i, test_preds_i)
+        truths_i = truths[:, i]
+        f1 = f1_score(results_i, truths_i, average='weighted')
+        acc = accuracy_score(results_i, truths_i)
         f1_total[emo] = f1
         acc_total[emo] = acc
         print("\t%s %s F1 score: %f" % (set, params.emo_labels[i], f1))
@@ -89,7 +92,7 @@ def test(feature_extractor, class_classifier, domain_classifier, source_dataload
     tgt_output_all = []
     tgt_label_all = []
 
-    class_criterion = nn.NLLLoss()
+    class_criterion = nn.BCEWithLogitsLoss()
 
     src_embeddings = []
     tgt_embeddings = []
@@ -100,26 +103,28 @@ def test(feature_extractor, class_classifier, domain_classifier, source_dataload
         constant = 2. / (1. + np.exp(-10 * p)) - 1.
 
         input1, label1 = sdata
-        if params.use_gpu:
-            input1, label1 = Variable(input1.cuda()), Variable(label1.cuda())
-            src_labels = Variable(torch.zeros((input1.size()[0])).type(torch.LongTensor).cuda())
-        else:
-            input1, label1 = Variable(input1), Variable(label1)
-            src_labels = Variable(torch.zeros((input1.size()[0])).type(torch.LongTensor))
+        input1 = input1.float().cuda()
+        label1 = label1.float().cuda()
 
-        output1 = class_classifier(feature_extractor(input1,
-                                                     embedding_dim=params.mod_dim))
+        # with torch.autograd.set_detect_anomaly(True):
+        #     if params.use_gpu:
+        #         input1, label1 = Variable(input1.cuda()), Variable(label1.cuda())
+        #     else:
+        #         input1, label1 = Variable(input1), Variable(label1)
+
+        output1 = class_classifier(feature_extractor(input1))
 
         src_embeddings.extend(output1.cpu().detach().numpy())
 
         #print("output1:", output1.shape)
-        output1 = output1.view(-1, 2)
+        # output1 = output1.view(-1, 2)
         #print("output1:", output1.shape)
         #print("label1:", label1.shape)
-        label1 = label1.view(-1)
+        #label1 = label1.view(-1)
 
         #print("label1:", label1.shape)
-        label1 = label1.long()
+        #label1 = label1.long()
+        #label1 = label1.squeeze(dim=2)
         src_class_loss = class_criterion(output1, label1)
 
         if (batch_idx + 1) % 10 == 0:
@@ -148,8 +153,8 @@ def test(feature_extractor, class_classifier, domain_classifier, source_dataload
     # print(sum)
 
 
-    if mode == 'test':
-        src_f1, src_acc = eval_data(src_label_all, src_output_all, "source")
+    #if mode == 'test':
+    src_f1, src_acc = eval_data(src_label_all, src_output_all, "source")
 
 
 
@@ -159,27 +164,37 @@ def test(feature_extractor, class_classifier, domain_classifier, source_dataload
         constant = 2. / (1. + np.exp(-10 * p)) - 1
 
         input2, label2 = tdata
+        input2 = input2.float().cuda()
+        label2 = label2.float().cuda()
         #print(input2.shape, label2.shape)
+
+        # with torch.autograd.set_detect_anomaly(True):
+        #     if params.use_gpu:
+        #         #input2, label2 = Variable(input2.cuda()), Variable(label2.cuda())
+        #     else:
+        #         input2, label2 = Variable(input2), Variable(label2)
+
         if params.use_gpu:
-            input2, label2 = Variable(input2.cuda()), Variable(label2.cuda())
-            tgt_labels = Variable(torch.ones((input2.size()[0])).type(torch.LongTensor).cuda())
+
+            target_labels1 = Variable(torch.ones((input2.size()[0])).cuda())
+            target_labels2 = Variable(torch.zeros((input2.size()[0])).cuda())
+            target_labels = torch.stack((target_labels1, target_labels2), dim=1)
         else:
             input2, label2 = Variable(input2), Variable(label2)
             tgt_labels = Variable(torch.ones((input2.size()[0])).type(torch.LongTensor))
 
-        output2 = class_classifier(feature_extractor(input2,
-                                                     embedding_dim=params.mod_dim))
+        output2 = class_classifier(feature_extractor(input2))
+
 
         tgt_embeddings.extend(output2.cpu().detach().numpy())
 
 
         #print("output2:", output2.shape)
         #TODO: output2 should be [20,8]
-        output2 = output2.view(-1, 2)
         #print("output2:", output2.shape)
         #print("label2:", label2.shape)
-        label2 = label2.view(-1)
-        label2 = label2.long()
+        # label2 = label2
+        # label2 = label2.long()
         #print("label2:", label2.shape)
 
         tgt_output_all.extend(output2.tolist())
@@ -195,11 +210,12 @@ def test(feature_extractor, class_classifier, domain_classifier, source_dataload
                 100. * batch_idx / len(source_dataloader), tgt_class_loss.item()
             ))
 
-    if mode == 'test':
-        tgt_f1, tg_acc = eval_data(tgt_label_all, tgt_output_all, "target")
+    #if mode == 'test':
+    tgt_f1, tg_acc = eval_data(tgt_label_all, tgt_output_all, "target")
 
     if epoch == 0 or epoch % 20 == 0:
         tsne_embeddings(src_embeddings, tgt_embeddings, epoch)
+
 
         # pred2 = output2.data.max(1, keepdim=True)[1]
         # target_correct += pred2.eq(label2.data.view_as(pred2)).cpu().sum()

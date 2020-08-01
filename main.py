@@ -69,8 +69,8 @@ def main(args):
     # init models
     #model_index = source_domain + '_' + target_domain
 
-    feature_extractor = models.Extractor(embedding_dim=params.mod_dim)
-    class_classifier = models.Class_classifier_LSTM()
+    feature_extractor = models.Extractor()
+    class_classifier = models.Class_classifier()
     domain_classifier = models.Domain_classifier()
     # feature_extractor = params.extractor_dict[model_index]
     # class_classifier = params.class_dict[model_index]
@@ -82,8 +82,8 @@ def main(args):
         domain_classifier.cuda()
 
     # init criterions
-    class_criterion = nn.NLLLoss()
-    domain_criterion = nn.NLLLoss()
+    class_criterion = nn.BCEWithLogitsLoss()
+    domain_criterion = nn.BCEWithLogitsLoss()
 
     # init optimizer
     optimizer = optim.Adam([{'params': feature_extractor.parameters()},
@@ -92,17 +92,14 @@ def main(args):
 
     for epoch in range(params.epochs):
         print('Epoch: {}'.format(epoch))
-        test.test(feature_extractor, class_classifier, domain_classifier, src_valid_dataloader, tgt_valid_dataloader, epoch)
         train.train(args.training_mode, feature_extractor, class_classifier, domain_classifier, class_criterion,
                     domain_criterion, src_train_dataloader, tgt_train_dataloader, optimizer, epoch)
-
+        test.test(feature_extractor, class_classifier, domain_classifier, src_valid_dataloader, tgt_valid_dataloader,
+                  epoch)
         if epoch == params.epochs - 1:
             test.test(feature_extractor, class_classifier, domain_classifier, src_test_dataloader, tgt_test_dataloader, epoch, mode='test')
         else:
             continue
-        # if epoch == 100:
-        #     feature_extractor.fc.register_forward_hook(models.get_activation('fc'))
-        #     out = feature_extractor
 
 
 
@@ -112,9 +109,9 @@ def parse_arguments(argv):
     """Command line parse."""
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--source_domain', type= str, default= 'iemocap', help= 'Choose source domain.')
+    parser.add_argument('--source_domain', type= str, default= 'mosei', help= 'Choose source domain.')
 
-    parser.add_argument('--target_domain', type= str, default= 'mosei', help = 'Choose target domain.')
+    parser.add_argument('--target_domain', type= str, default= 'iemocap', help = 'Choose target domain.')
 
     #parser.add_argument('--fig_mode', type=str, default=None, help='Plot experiment figures.')
 
@@ -126,7 +123,7 @@ def parse_arguments(argv):
 
     #parser.add_argument('--embed_plot_epoch', type= int, default=100, help= 'Epoch number of plotting embeddings.')
 
-    parser.add_argument('--lr', type= float, default= 0.01, help= 'Learning rate.')
+    parser.add_argument('--lr', type= float, default= 0.001, help= 'Learning rate.')
 
     parser.add_argument('--modality', type=str, default='acoustic', help='specify modality: acoustic or visual.')
 
